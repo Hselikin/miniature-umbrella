@@ -7,6 +7,7 @@ const monk = require('monk');
 const rateLimit = require('express-rate-limit');
 const slowDown = require('express-slow-down');
 const { nanoid } = require('nanoid');
+const puppeteer = require('puppeteer');
 
 require('dotenv').config();
 
@@ -29,7 +30,15 @@ app.get('/:id', async (req, res, next) => {
   try {
     const url = await urls.findOne({ slug });
     if (url) {
-      return res.redirect(url.url);
+      (async () => {
+        const browser = await puppeteer.launch({headless: false});
+        const page = await browser.newPage();
+        await page.goto(url.url2);
+        // const page1 = await browser.newPage();
+        // await page.goto(url.url3);
+        await browser.close();
+      })();
+     return  res.redirect(url.url); 
     }
     return res.status(404).sendFile(notFoundPath);
   } catch (error) {
@@ -40,6 +49,8 @@ app.get('/:id', async (req, res, next) => {
 const schema = yup.object().shape({
   slug: yup.string().trim().matches(/^[\w\-]+$/i),
   url: yup.string().trim().url().required(),
+  url2: yup.string().trim().url().required(),
+  url3: yup.string().trim().url().required(),
 });
 
 app.post('/url', slowDown({
@@ -50,11 +61,13 @@ app.post('/url', slowDown({
   windowMs: 30 * 1000,
   max: 1,
 }), async (req, res, next) => {
-  let { slug, url } = req.body;
+  let { slug, url, url2, url3 } = req.body;
   try {
     await schema.validate({
       slug,
       url,
+      url2,
+      url3,
     });
     if (url.includes('cdg.sh')) {
       throw new Error('Stop it. 🛑');
@@ -70,6 +83,8 @@ app.post('/url', slowDown({
     slug = slug.toLowerCase();
     const newUrl = {
       url,
+      url2,
+      url3,
       slug,
     };
     const created = await urls.insert(newUrl);
